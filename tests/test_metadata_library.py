@@ -181,6 +181,37 @@ class LibraryNfoTests(unittest.TestCase):
         self.assertEqual(payload['series'], 'Collection')
         self.assertEqual(payload['release_date'], '2024-01-02')
 
+    def test_suffixed_video_finds_the_release_named_sidecars(self):
+        folder = self.root / 'IPZZ-792'
+        folder.mkdir()
+        (folder / 'IPZZ-792-C.mp4').touch()
+        (folder / 'IPZZ-792.nfo').write_text('<movie><code>IPZZ-792</code></movie>', encoding='utf-8')
+        (folder / 'IPZZ-792-poster.jpg').touch()
+        video = folder / 'IPZZ-792-C.mp4'
+        nfo, posters = sidecars(video)
+        self.assertEqual(nfo, folder / 'IPZZ-792.nfo')
+        self.assertEqual(posters, [folder / 'IPZZ-792-poster.jpg'])
+        self.assertEqual(read_nfo(nfo)[0]['id'], 'IPZZ-792')
+
+    def test_sidecar_named_by_normalised_code_matches_unhyphenated_video(self):
+        self.root.joinpath('ABP633.mp4').touch()
+        self.root.joinpath('ABP-633.nfo').touch()
+        self.root.joinpath('ABP-633-poster.jpg').touch()
+        nfo, posters = sidecars(self.root / 'ABP633.mp4')
+        self.assertEqual(nfo, self.root / 'ABP-633.nfo')
+        self.assertEqual(posters, [self.root / 'ABP-633-poster.jpg'])
+
+    def test_sidecars_named_after_the_video_still_win(self):
+        self.root.joinpath('ABC-123-UC.mp4').touch()
+        self.root.joinpath('ABC-123-UC.nfo').touch()
+        self.root.joinpath('ABC-123.nfo').touch()
+        self.assertEqual(sidecars(self.root / 'ABC-123-UC.mp4')[0], self.root / 'ABC-123-UC.nfo')
+
+    def test_code_tag_without_a_release_shape_stays_no_identity(self):
+        path = self.root / 'movie.nfo'
+        path.write_text('<movie><code>TODO</code><title>作品</title></movie>', encoding='utf-8')
+        self.assertEqual(read_nfo(path)[0]['id'], '')
+
     def test_jav_id_and_imdb_id_have_distinct_meanings(self):
         path = self.root / 'movie.nfo'
         path.write_text('<movie><id>ABW-358</id></movie>', encoding='utf-8')

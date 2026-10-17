@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
 
-from .catalog_rules import release_code_from_text
+from .catalog_rules import release_code_from_filename, release_code_from_text
 from .scan import VIDEO
 
 
@@ -42,16 +42,32 @@ def _numbered_image_set(stem: str, files: dict[str, Path]) -> bool:
     return False
 
 
+def stem_candidates(video: Path) -> list[str]:
+    """正片文件名的候选名，从最贴近原文件排到最贴近同目录的边车命名。
+
+    一批文件用番号统一命名、正片带字幕或碟号后缀时（`IPZZ-792-C.mp4` 配
+    `IPZZ-792.nfo`），只按 `video.stem` 找会一个都找不到。去连字符的写法（`ABP633` 配
+    `ABP-633.nfo`）各按各的来，所以两种都留着。
+    """
+    stems = [video.stem]
+    code = release_code_from_filename(video.stem)
+    if code and code.casefold() not in {stem.casefold() for stem in stems}:
+        stems.append(code)
+    return stems
+
+
 def sidecars(video: Path, files: dict[str, Path] | None = None):
     """`video` 旁边的 NFO 与海报候选；`files` 是调用方已列好的同目录索引，省掉再列一遍。"""
     files = directory_files(video.parent) if files is None else files
     single = sum(path.suffix.lower() in VIDEO for path in files.values()) == 1
-    nfo = files.get((video.stem + '.nfo').casefold())
+    stems = stem_candidates(video)
+    nfo = next((files[(stem + '.nfo').casefold()] for stem in stems
+                if (stem + '.nfo').casefold() in files), None)
     if nfo is None and single:
         nfo = files.get('movie.nfo')
-    names = [video.stem + '-poster']
+    names = [stem + '-poster' for stem in stems]
     if not _numbered_image_set(video.stem, files):
-        names.append(video.stem)
+        names.extend(stems)
     if single:
         names.extend(['poster', 'folder', 'cover'])
     posters = [files[name.casefold() + extension] for name in names
@@ -76,7 +92,7 @@ def read_nfo(path: Path):
                      if (root.findtext(key) or '').strip()), '')
     identifiers = [node.text for node in root.findall('uniqueid')
                    if node.get('type', '').lower() in {'javboss', 'jav', 'javid', 'dvdid', 'num'}]
-    identifiers.extend([text('num'), text('sorttitle')])
+    identifiers.extend([text('num'), text('sorttitle'), text('code')])
     # 通用 id 常是 IMDb/TMDb；仅明确的番号形状参与 JAV 身份识别。
     for value in [text('id'), *(node.text or '' for node in root.findall('uniqueid'))]:
         if re.fullmatch(r'(?:[A-Za-z]{2,12}[-_]\d{2,8}|FC2[-_](?:PPV[-_])?\d+)', value.strip(), re.I):
