@@ -1,0 +1,293 @@
+name: Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Windows runner 的 stdout 默认按本机 ANSI（cp1252）编码，而项目里的脚本和错误
+# 消息大量是中文——`print(f"首尾帧审计失败：{error}")` 在 runner 上直接抛
+# UnicodeEncodeError，15 个脚本类用例因此全红，本地却全绿。
+#
+# `tests/test_subprocess_encoding.py` 已经把这条口径写死过一次：「由 Peach 控制的
+# 子进程还必须用 PYTHONIOENCODING=utf-8 固定输出端」。CI 缺的正是这一层——那条
+# 测试管的是源码里怎么调 subprocess，管不到 runner 自己的 stdout。
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      wheel_matrix: ${{ steps.plan.outputs.wheel_matrix }}
+      wide: ${{ steps.plan.outputs.wide }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: 生成验证矩阵
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+        run: uv run --locked --python 3.14 scripts/ci_plan.py --event "$EVENT_NAME" --base "$BASE_SHA"
+
+  wheel-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv lock --check
+      - run: uv build --wheel --out-dir wheelhouse
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheel-smoke
+          path: |
+            wheelhouse/*.whl
+            scripts/smoke_wheel.py
+  wheel-smoke:
+    name: wheel 最小安装 / ${{ matrix.os }} / ${{ matrix.python }}
+    needs: [plan, wheel-build]
+    strategy:
+      matrix: ${{ fromJSON(needs.plan.outputs.wheel_matrix) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: wheel-smoke
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: 安装正式 wheel
+        shell: bash
+        run: |
+          python -m pip install --no-cache-dir wheelhouse/*.whl
+          python -m pip check
+      - name: 源码树外冒烟
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          python "$GITHUB_WORKSPACE/scripts/smoke_wheel.py"
+  python:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }} / ${{ matrix.scope }} / ${{ matrix.shard_index }}
+    needs: plan
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+          check-latest: true
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      # `web` 与 `packaging` 域里的 tsc、lint、vitest 和浏览器冒烟在 CI 缺前置条件时判失败
+      # （`tests/support/conditions.py`）。`core` 不含这些用例，其余域都要装齐。
+      - uses: actions/setup-node@v7
+        if: matrix.scope != 'core'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: 安装前端依赖
+        if: matrix.scope != 'core'
+        run: npm --prefix frontend ci
+      # 浏览器冒烟只在 Windows 上执行（声明根是盘符），只有那里要 ffmpeg 与 Chrome。
+      - name: 安装固定版本 FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        if: runner.os == 'Windows' && matrix.scope != 'core'
+        with:
+          ffmpeg-version: "9.0.1"
+          github-token: ${{ github.token }}
+      - name: 指定 e2e 用的 Chrome
+        if: runner.os == 'Windows' && matrix.scope != 'core'
+        shell: pwsh
+        run: |
+          $peachChrome = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
+          if (-not (Test-Path -LiteralPath $peachChrome)) { throw "runner 上没有 Chrome：$peachChrome" }
+          "PEACH_E2E_CHROME=$peachChrome" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: 安装 Windows 依赖
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          uv sync --locked --all-extras --python python
+          if ($LASTEXITCODE -ne 0) { throw 'uv 锁定安装失败' }
+          uv pip check --python .venv/Scripts/python.exe
+          if ($LASTEXITCODE -ne 0) { throw 'uv 依赖检查失败' }
+      - name: 运行 Windows 正式测试
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: '& .\scripts\test.ps1 -Scope ${{ matrix.scope }} -Fresh -Base $env:BASE_SHA -ShardIndex ${{ matrix.shard_index }} -ShardCount ${{ matrix.shard_count }}'
+      - name: 保存浏览器测试日志
+        if: always() && runner.os == 'Windows' && matrix.scope != 'core'
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-${{ matrix.python }}-${{ matrix.scope }}-${{ matrix.shard_index }}
+          path: |
+            build/agent-verification/browser/*.tap
+            build/agent-verification/browser/network/*.json
+          if-no-files-found: ignore
+      - name: 安装 macOS 依赖
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          uv sync --locked --all-extras --python python
+          uv pip check --python .venv/bin/python
+      - name: 运行 macOS 正式测试
+        if: runner.os == 'macOS'
+        shell: bash
+        run: ./scripts/test.sh ${{ matrix.scope }} --fresh --base "$BASE_SHA" --shard-index ${{ matrix.shard_index }} --shard-count ${{ matrix.shard_count }}
+
+  web-bundle:
+    name: island 产物与前端测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm --prefix frontend ci
+      - run: npm --prefix frontend run typecheck
+      - name: 前端 lint 与扫描范围
+        run: |
+          npm --prefix frontend run lint --silent -- --format=json > frontend-lint.json
+          node --input-type=module -e 'import { readFileSync } from "node:fs"; import assert from "node:assert/strict"; const report = JSON.parse(readFileSync("frontend-lint.json", "utf8")); assert.deepEqual(report.diagnostics, []); assert.ok(report.number_of_files > 0, "lint 必须扫描文件");'
+      - run: npm --prefix frontend test
+      - run: npm --prefix frontend run build
+      # 产物提交进 Git，因为运行时和打包都没有 Node（ADR-0022）。一旦源码改了却忘了
+      # 重新构建并提交，服务端发出去的就还是旧 island——本地跑测试也看不出来，只有
+      # 在这里比一次才拦得住。
+      #
+      # 先 `git add -N`：光 `git diff` 只看已跟踪的文件，构建新出的产物（某个 island
+      # 开始带自己的 CSS 就会多一份 peach-ui.css）是未跟踪的，那条门槛会直接放过去。
+      - name: 核对 web/dist 与源码一致
+        run: |
+          git add --intent-to-add -- web/dist
+          git diff --exit-code -- web/dist
+      # 与下面 web-vendor 的 audit 同一口径：advisories 端点偶发 503，退避重试三次。
+      - name: npm audit (frontend)
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            npm --prefix frontend audit --audit-level=high && exit 0
+            echo "npm audit 第 ${attempt} 次未成功，60 秒后重试"
+            sleep 60
+          done
+          exit 1
+
+  # 浏览器冒烟（`frontend/e2e/smoke.test.ts`）、设计决定断言（`design-*.test.ts`）与交互回归。
+  # runner 上 `GITHUB_ACTIONS=true`，浏览器用例按设计、交互、冒烟三批串行跑。
+  # `python` 矩阵的 Windows 行平时只跑 `core`，这几组用例靠这里执行；矩阵扩成全量
+  # （`plan` 的 `wide`）时 Windows 行已经把 `web` 域跑过一遍，这里就不再跑第二遍。
+  web-e2e:
+    name: 浏览器冒烟与设计决定断言
+    needs: [plan]
+    if: needs.plan.outputs.wide != 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm --prefix frontend ci
+      - name: 安装固定版本 FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        with:
+          ffmpeg-version: "9.0.1"
+          github-token: ${{ github.token }}
+      - name: 指定 e2e 用的 Chrome
+        shell: pwsh
+        run: |
+          $peachChrome = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
+          if (-not (Test-Path -LiteralPath $peachChrome)) { throw "runner 上没有 Chrome：$peachChrome" }
+          "PEACH_E2E_CHROME=$peachChrome" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: 安装 Python 依赖
+        shell: pwsh
+        run: |
+          uv sync --locked --all-extras --python python
+          if ($LASTEXITCODE -ne 0) { throw 'uv 锁定安装失败' }
+      - name: 运行 web 域
+        shell: pwsh
+        run: '& .\scripts\test.ps1 -Scope web -Fresh'
+      - name: 保存浏览器测试日志
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-web
+          path: |
+            build/agent-verification/browser/*.tap
+            build/agent-verification/browser/network/*.json
+          if-no-files-found: ignore
+
+  web-vendor:
+    name: 固定前端依赖
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check:vendor
+      # 审计结果来自 registry.npmjs.org 的 advisories 端点，它偶发 503；
+      # 退避重试三次，仍失败才算红——那时是真的查不到，不是本仓库的问题。
+      - name: npm audit
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            npm audit --audit-level=high && exit 0
+            echo "npm audit 第 ${attempt} 次未成功，60 秒后重试"
+            sleep 60
+          done
+          exit 1
+
+  verified:
+    name: 完整验证结果
+    if: always()
+    needs: [plan, python, wheel-smoke, web-bundle, web-e2e, web-vendor]
+    runs-on: ubuntu-latest
+    steps:
+      # `web-e2e` 只在矩阵没扩成全量时执行；全量矩阵下它按条件跳过，`web` 域已由
+      # Windows 全量行覆盖。别的 job 跳过或失败都算红。
+      - name: 所有必需任务均成功
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          WIDE: ${{ needs.plan.outputs.wide }}
+        run: |
+          python -c 'import json, os; results=json.loads(os.environ["RESULTS"]); wide=os.environ["WIDE"] == "true"; bad={name: job["result"] for name, job in results.items() if job["result"] != "success" and not (name == "web-e2e" and wide and job["result"] == "skipped")}; assert not bad, (bad, results)'

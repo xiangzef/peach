@@ -1,0 +1,37 @@
+.venv*/
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+.claude/worktrees/
+# Codex 每次在这台机器上开工都会重写这份环境描述，它记的是本机怎么起项目，
+# 不是项目本身的约定。`.codex/hooks.json` 是约定，留在仓库里。
+.codex/environments/
+*.log
+*.bak
+
+# Peach 的代码仓库不保存真实数据库、媒体、凭据、缓存或生成物。
+*.db
+*.db-wal
+*.db-shm
+*.sqlite*
+data/
+runtime/
+bin/
+
+# frontend/：island 构建产物进 Git（运行时和打包都没有 Node，见 ADR-0022），
+# 但依赖与构建缓存不进。上面的 `dist/` 会连 web/dist 一起排除，这里放回来。
+!web/dist/
+frontend/node_modules/
+frontend/.vite/
+frontend/vite.config.ts.timestamp-*
+frontend/vitest.config.ts.timestamp-*
