@@ -64,7 +64,7 @@ export interface LibraryProcessingData {
 /** 一次写操作的请求体：指定处理阶段与影片，或者按任务号重试失败项。 */
 export type LibraryProcessingCommand =
   | Record<string, never>
-  | { stage: 'scan' | 'collect' | 'previews' | 'metadata'; asset_ids?: number[] }
+  | { stage: 'scan' | 'local' | 'collect' | 'previews' | 'metadata'; asset_ids?: number[] }
   | { job_id: string; retry: number[] };
 
 export const fetchLibraryProcessing = (signal?: AbortSignal) =>

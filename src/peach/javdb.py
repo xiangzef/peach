@@ -25,7 +25,7 @@ import re
 
 from .social_links import name_key
 
-BASE = "https://javdb.com/"
+BASE = "https://javdb573.com/"
 SEARCH = BASE + "search?f=actor&q={}"
 
 #: 从资料页取来的名字写进 `entity_alias` 时记的来源。两个脚本都往这里写

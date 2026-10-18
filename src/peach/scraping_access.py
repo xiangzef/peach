@@ -71,7 +71,8 @@ SOURCES = {
     # 回 200 的验证页由解析器认成 `cloudflare_challenge`，经 `SourceTransport.hold` 进同一份记录。
     # `session`：公开采集也带上用户在采集设置里贴的 Cookie。javdb 有登录墙，JavBus 有年龄门，
     # 不带只回确认页；Cookie 由用户在浏览器里过门或登录后贴进来，Peach 不读浏览器的 Cookie 库。
-    "javdb": {"label": "JavDB", "domains": ("javdb.com", "jdbstatic.com", "jdbimgs.com"), "login": "https://javdb.com/",
+    "javdb": {"label": "JavDB", "domains": ("javdb573.com", "javdb.com", "jdbstatic.com", "jdbimgs.com"),
+              "login": "https://javdb573.com/",
               "cookie": True, "session": True, "blocked_pause": 24 * 3600},
     "javbus": {"label": "JavBus", "domains": ("javbus.com",), "login": "https://www.javbus.com/", "cookie": True,
                "session": True, "blocked_pause": 6 * 3600},

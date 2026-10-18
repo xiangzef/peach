@@ -136,7 +136,7 @@ class DesktopSettingsTests(unittest.TestCase):
             broken['javdb']['host'] = 'javdb.com/actors'
             self.assertEqual(client.post('/api/configuration/entry-links',json={'sites':broken}).status_code,400)
             self.assertEqual(entry_links.read(self.config.directory('state'))['javdb']['host'],
-                             'javdb.com')
+                             'javdb573.com')
 
     def test_startup_does_not_overwrite_another_installation(self):
         with patch.object(desktop_startup, 'startup_directory', return_value=self.root), patch.object(desktop_startup, 'shortcut', side_effect=[

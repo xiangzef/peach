@@ -73,8 +73,8 @@ LUXU_DATA = {"props": {"pageProps": {"works": [
 ]}}}
 LUXU_SEARCH = "https://www.avbase.net/works?q=259LUXU-1514"
 JAVBUS_WORK = "https://www.javbus.com/ABW-358"
-JAVDB_SEARCH = "https://javdb.com/search?q=ABW-358&f=all"
-JAVDB_DETAIL = "https://javdb.com/v/Zb7mX?locale=zh"
+JAVDB_SEARCH = "https://javdb573.com/search?q=ABW-358&f=all"
+JAVDB_DETAIL = "https://javdb573.com/v/Zb7mX?locale=zh"
 
 
 def avbase_page(data):
@@ -189,7 +189,7 @@ class CommunityCatalogTests(unittest.TestCase):
             found["actresses"],
             [{"japanese_name": "涼森れむ", "profile_source": "javdb", "external_id": "a"}],
             "男优不进演员；女优带着她在 javdb 的演员 id")
-        self.assertEqual((found["source_url"], found["cover_urls"]), ("https://javdb.com/v/Zb7mX", [JAVDB_COVER]))
+        self.assertEqual((found["source_url"], found["cover_urls"]), ("https://javdb573.com/v/Zb7mX", [JAVDB_COVER]))
 
     def test_javdb_reads_the_cover_whichever_side_of_the_class_the_src_sits(self):
         """站方在封面那个 img 上改过属性顺序，页面其余部分照常解析，缺的只是封面。"""
@@ -214,7 +214,7 @@ class CommunityCatalogTests(unittest.TestCase):
                       '<a href="/tags/c">アナル</a><a href="/tags/d">未收录分類</a>'
                       '<a href="/tags/a">高跟鞋</a><a href="/tags/empty"> </a></span></div>')
         page = JAVDB_PAGE + categories.encode()
-        record = JavDBSource().parse(Page("https://javdb.com/v/Zb7mX", page), "ABW-358")
+        record = JavDBSource().parse(Page("https://javdb573.com/v/Zb7mX", page), "ABW-358")
         self.assertEqual(record.tags, ("高跟鞋", "絲襪", "アナル", "未收录分類"))
         found = work(JavDBSource(), {JAVDB_SEARCH: JAVDB_RESULTS, JAVDB_DETAIL: page}, "ABW-358")
         self.assertEqual(found, record.payload())
@@ -226,7 +226,7 @@ class CommunityCatalogTests(unittest.TestCase):
         for category_panel in ("", empty_panel):
             with self.subTest(category_panel=category_panel):
                 record = JavDBSource().parse(
-                    Page("https://javdb.com/v/Zb7mX", JAVDB_PAGE + category_panel.encode()), "ABW-358")
+                    Page("https://javdb573.com/v/Zb7mX", JAVDB_PAGE + category_panel.encode()), "ABW-358")
                 self.assertEqual(record.tags, ())
                 self.assertEqual(record.payload()["genres"], [])
 
@@ -252,12 +252,12 @@ class CommunityCatalogTests(unittest.TestCase):
 
     def test_javdb_payload_equals_the_snapshot_shape_field_for_field(self):
         expected = {
-            "id": "ABW-358", "source_url": "https://javdb.com/v/Zb7mX", "title": TITLE,
+            "id": "ABW-358", "source_url": "https://javdb573.com/v/Zb7mX", "title": TITLE,
             "actresses": [{"japanese_name": "涼森れむ", "profile_source": "javdb", "external_id": "a"}],
             "maker": "プレステージ", "label": "", "series": "", "director": "", "release_date": "2023-05-23",
             "runtime": 210, "genres": [], "cover_urls": [JAVDB_COVER], "cover_url": JAVDB_COVER}
         self.assertEqual(work(JavDBSource(), {JAVDB_SEARCH: JAVDB_RESULTS, JAVDB_DETAIL: JAVDB_PAGE}, "ABW-358"), expected)
-        record = JavDBSource().parse(Page("https://javdb.com/v/Zb7mX", JAVDB_PAGE), "ABW-358")
+        record = JavDBSource().parse(Page("https://javdb573.com/v/Zb7mX", JAVDB_PAGE), "ABW-358")
         self.assertEqual((record.source, record.provenance, record.code), ("javdb", "javdb-page", "ABW-358"))
         self.assertEqual(record.payload(), expected)
 
@@ -277,7 +277,7 @@ class CommunityCatalogTests(unittest.TestCase):
         self.assertEqual((caught.exception.reason, str(caught.exception)), (FailureReason.NOT_FOUND, "HTTP 404"))
         mismatched = JAVDB_PAGE.replace(b'<a href="/video_codes/ABW">ABW</a>-358', b'<a href="/video_codes/ABW">ABW</a>-359')
         with self.assertRaises(SourceFailure) as caught:
-            JavDBSource().parse(Page("https://javdb.com/v/Zb7mX", mismatched), "ABW-358")
+            JavDBSource().parse(Page("https://javdb573.com/v/Zb7mX", mismatched), "ABW-358")
         self.assertEqual((caught.exception.reason, caught.exception.kind, str(caught.exception)),
                          (FailureReason.PARSE_ERROR, "unavailable", "javdb 详情页的番号与搜索结果不一致"))
 

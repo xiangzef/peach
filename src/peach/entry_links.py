@@ -103,7 +103,7 @@ SITES: tuple[EntrySite, ...] = (
               "www.minnano-av.com", "/actress{minnano_id}.html",
               SLOT_PILL, "brand-minnano"),
     EntrySite("javdb", "JavDB", "JavDB", "javdb_id", "javdb",
-              "javdb.com", "/actors/{javdb_id}",
+              "javdb573.com", "/actors/{javdb_id}",
               SLOT_MARK, "mark-javdb", jav_only=True, mirrored=True),
     EntrySite("missav", "MISSAV", "MISSAV", "name", "",
               "missav.ws", "/dm3/cn/actresses/{name}",

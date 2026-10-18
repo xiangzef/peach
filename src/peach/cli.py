@@ -504,6 +504,7 @@ def _process_library(args: argparse.Namespace) -> int:
     with cli_run('library-processing', args.db, label='资料处理') as handle:
         result = process_library(config, args.db, config.directory('generated'),
                                  config.directory('generated') / 'covers', location=args.location,
+                                 stage=args.stage,
                                  database=LedgerDatabase(args.db),
                                  report=lambda state: print(f"{state['stage']}：{state['checked']}/{state['total']}", flush=True))
         rows = declared_rows(result.get('followups'))
@@ -754,6 +755,9 @@ def build_parser() -> argparse.ArgumentParser:
     process_parser = commands.add_parser('process', help='扫描文件并补全馆藏资料')
     process_parser.add_argument('location', nargs='?', default='configured')
     process_parser.add_argument('--db', type=Path, default=DEFAULT_DB)
+    process_parser.add_argument('--stage', default='all',
+                                choices=('all', 'scan', 'local', 'collect', 'metadata', 'previews'),
+                                help='all 全部；scan 只登记文件；local 只读本机（番号/海报/本地 NFO，不联网）')
     process_parser.set_defaults(handler=_process_library)
 
     token = commands.add_parser("token", help="查看局域网访问口令，没有就生成一份")

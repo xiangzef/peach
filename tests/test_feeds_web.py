@@ -60,7 +60,7 @@ class FeedWebFixture(unittest.TestCase):
         # assert 之后才写完，也可能在临时目录删掉之后才醒。这里关掉自动领取，
         # 要跑后继的用例自己 `drain()`。
         self.contract.followups.stop()
-        self.url = "https://javdb.com/actors/Smp1"
+        self.url = "https://javdb573.com/actors/Smp1"
         sample = Path(self.temporary.name) / "feed-sample.html"
         sample.write_text(SAMPLE, encoding="utf-8")
         self.transport = FakeTransport({self.url: HttpResponse(
@@ -593,7 +593,7 @@ class FeedWebTest(FeedWebFixture):
         self._add()
         self._check()
         with self.contract.database.write_transaction() as connection:
-            connection.execute("UPDATE feed_discovery SET link='https://javdb.com/v/Source01' WHERE code='SSIS-950'")
+            connection.execute("UPDATE feed_discovery SET link='https://javdb573.com/v/Source01' WHERE code='SSIS-950'")
         with patch('peach.jav_cover_fetch.best_cover', side_effect=Unavailable('官方封面未取得')), \
                 patch('peach.javdb_public.PUBLIC_API.image') as source_image, \
                 patch('peach.javdb_public.PUBLIC_API.remember_movie_identity') as identity:
@@ -735,7 +735,7 @@ class PerformerFeedSwitchTest(FeedWebFixture):
 
     def setUp(self):
         super().setUp()
-        self.page = "https://javdb.com/actors/pRMq"
+        self.page = "https://javdb573.com/actors/pRMq"
         self.transport.responses[self.page] = HttpResponse(
             200, {"Content-Type": "text/html"}, JAVDB_PAGE.encode("utf-8"), self.page)
         original = web_feeds._transport
@@ -787,7 +787,7 @@ class PerformerFeedSwitchTest(FeedWebFixture):
 
     def test_a_page_of_only_compilations_is_backfilled_from_her_solo_works(self):
         retired = self._performer("篠田ゆう", ["WE4e"])
-        page = "https://javdb.com/actors/WE4e"
+        page = "https://javdb573.com/actors/WE4e"
         self.transport.responses[page] = HttpResponse(
             200, {"Content-Type": "text/html"}, RETIRED_PAGE.encode("utf-8"), page)
         self.transport.responses[page + "?t=s"] = HttpResponse(
@@ -833,7 +833,7 @@ class PerformerFeedSwitchTest(FeedWebFixture):
         self._settled()
         self.assertEqual(len(result["sources"]), 2)
         self.assertEqual(sorted(source["url"] for source in self._sources()),
-                         ["https://javdb.com/actors/ZX5z7", "https://javdb.com/actors/d45k9"])
+                         ["https://javdb573.com/actors/ZX5z7", "https://javdb573.com/actors/d45k9"])
 
     def test_the_profile_carries_the_switch_only_when_she_has_a_javdb_page(self):
         profile = dispatch_api_get(self.contract, "/api/entity",
@@ -883,10 +883,10 @@ class FeedFollowByNameTest(PerformerFeedSwitchTest):
 
     def setUp(self):
         super().setUp()
-        self.search = "https://javdb.com/search?f=actor&q=%E7%80%AC%E6%88%B8%E7%92%B0%E5%A5%88"
+        self.search = "https://javdb573.com/search?f=actor&q=%E7%80%AC%E6%88%B8%E7%92%B0%E5%A5%88"
         self._serve(self.search, SEARCH_PAGE)
         for actor_id in ("Kn01", "Kn02", "Tw01", "Tw02"):
-            self._serve(f"https://javdb.com/actors/{actor_id}", JAVDB_PAGE)
+            self._serve(f"https://javdb573.com/actors/{actor_id}", JAVDB_PAGE)
 
     def _serve(self, url, html):
         self.transport.responses[url] = HttpResponse(
@@ -914,7 +914,7 @@ class FeedFollowByNameTest(PerformerFeedSwitchTest):
         self.assertEqual([card["id"] for card in result["candidates"]], ["Kn01", "Kn02", "Zz99"])
         first = result["candidates"][0]
         self.assertEqual(first["names"], ["瀬戸環奈", "瀨戶環奈", "濑户环奈"])
-        self.assertEqual(first["url"], "https://javdb.com/actors/Kn01")
+        self.assertEqual(first["url"], "https://javdb573.com/actors/Kn01")
         self.assertEqual(result["candidates"][1]["record"], "無碼")
         # 有碼与無碼各一张，是同一个人；别人那张不在预勾里。
         self.assertEqual(result["suggested"], ["Kn01", "Kn02"])
@@ -963,7 +963,7 @@ class FeedFollowByNameTest(PerformerFeedSwitchTest):
         self.assertEqual(json.loads(refs[0]["metadata_json"])["source"], web_feeds.FOLLOW_SOURCE)
         # 两个演员页各一条源，全部启用、挂在她名下，当场拉了一趟。
         self.assertEqual(sorted(source["url"] for source in self._sources()),
-                         ["https://javdb.com/actors/Kn01", "https://javdb.com/actors/Kn02"])
+                         ["https://javdb573.com/actors/Kn01", "https://javdb573.com/actors/Kn02"])
         self.assertTrue(all(source["entity_id"] == result["entity_id"] for source in self._sources()))
         self.assertEqual(self._settled()["added"], 2)
         # 新建的是零作品实体：她的资料页打得开，但作品索引里还没有她。

@@ -59,7 +59,7 @@ SOURCE = "auto:performer-profile"
 MINNANO, AVWIKIDB, JAVDB = alias.MINNANO, "avwikidb", "javdb"
 #: javdb 的主机间隔，与 `harvest_directory_links.SOURCE_INTERVAL` 同一档（docs/SOURCING.md）。
 JAVDB_INTERVAL = 5.0
-_JAVDB_LIMITER = HostLimiter({"javdb.com": JAVDB_INTERVAL})
+_JAVDB_LIMITER = HostLimiter({"javdb573.com": JAVDB_INTERVAL, "javdb.com": JAVDB_INTERVAL})
 
 #: 每轮处理任务给存量的名额。一条最多问两站五六次、每次隔 3 秒，给多了会把头像与厂牌挤到很后面；
 #: 九百多位女优按这个名额要一个多月的处理轮次才轮遍，存量本来就不赶。

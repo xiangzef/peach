@@ -1247,7 +1247,7 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         entries = response.json()["entry_links"]
         self.assertEqual([row["site"] for row in entries], ["javdb", "missav"])
         self.assertEqual([row["slot"] for row in entries], ["mark", "mark"])
-        self.assertEqual(entries[0]["url"], "https://javdb.com/actors/NPD3")
+        self.assertEqual(entries[0]["url"], "https://javdb573.com/actors/NPD3")
         self.assertTrue(entries[1]["url"].startswith("https://missav.ws/dm3/cn/actresses/%"))
 
     async def test_entity_entries_use_paired_current_han_stage_name(self):

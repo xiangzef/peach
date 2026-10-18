@@ -27,7 +27,7 @@ class EntryLinkAddressTests(unittest.TestCase):
         # minnano-av 是一份资料页，排进上面那排链接；看片那两枚自己一行。
         self.assertEqual([row["slot"] for row in rows], ["pill", "mark", "mark"])
         self.assertEqual(rows[0]["url"], "https://www.minnano-av.com/actress155084.html")
-        self.assertEqual(rows[1]["url"], "https://javdb.com/actors/QDvG")
+        self.assertEqual(rows[1]["url"], "https://javdb573.com/actors/QDvG")
         # 药丸上写站点自己的名字，取自 minnano-av 官网的 title。
         self.assertEqual([row["label"] for row in rows],
                          ["みんなのAV", "JavDB", "MISSAV"])
@@ -44,8 +44,8 @@ class EntryLinkAddressTests(unittest.TestCase):
         self.assertEqual([row["label"] for row in pages], ["JavDB", "JavDB ②"])
         self.assertEqual([row["ordinal"] for row in pages], ["", "②"])
         self.assertEqual([row["url"] for row in pages],
-                         ["https://javdb.com/actors/d45k9",
-                          "https://javdb.com/actors/ZX5z7"])
+                         ["https://javdb573.com/actors/d45k9",
+                          "https://javdb573.com/actors/ZX5z7"])
 
     def test_a_site_without_an_id_is_absent_instead_of_a_search_address(self):
         rows = entry_links.build(entry_links.defaults(), "深田えいみ",
@@ -218,9 +218,9 @@ class EntryLinkAddressTests(unittest.TestCase):
         self.assertEqual(rows[0]["url"], "https://javdb521.com/actors/NPD3")
 
     def test_the_feed_address_stays_on_javdb_whatever_the_mirror(self):
-        """订阅地址按主机计限流预算，跟着镜像走就绕开了 `javdb.com` 那份预算。"""
+        """订阅地址按主机计限流预算，跟着镜像走就绕开了 `javdb573.com` 那份预算。"""
         self.assertEqual(entry_links.javdb_actor_pages("七沢みあ", [ref("javdb", "NPD3")]),
-                         ["https://javdb.com/actors/NPD3"])
+                         ["https://javdb573.com/actors/NPD3"])
         self.assertEqual(entry_links.javdb_actor_pages(
             "145cm色白お嬢様", [ref("stash", "12")]), [])
 
@@ -229,12 +229,12 @@ class EntryLinkAddressTests(unittest.TestCase):
         settings = entry_links.defaults()
         settings["javdb"]["host"] = "javdb.com/actors"
         rows = entry_links.build(settings, "七沢みあ", [ref("javdb", "NPD3")])
-        self.assertEqual(rows[0]["url"], "https://javdb.com/actors/NPD3")
+        self.assertEqual(rows[0]["url"], "https://javdb573.com/actors/NPD3")
 
     def test_an_empty_domain_means_the_default_one(self):
         """配置页那个框默认就是空的：留空是「没换过」，不是「没有地址」。"""
         rows = entry_links.build({"javdb": {"host": ""}}, "七沢みあ", [ref("javdb", "NPD3")])
-        self.assertEqual(rows[0]["url"], "https://javdb.com/actors/NPD3")
+        self.assertEqual(rows[0]["url"], "https://javdb573.com/actors/NPD3")
 
 
 class EntryLinkSettingsFileTests(unittest.TestCase):
@@ -260,7 +260,7 @@ class EntryLinkSettingsFileTests(unittest.TestCase):
         rows = {row["key"]: row for row in entry_links.snapshot(self.root)["sites"]}
         self.assertEqual(sorted(rows), ["javdb", "missav"])
         self.assertEqual(rows["javdb"]["host"], "javdb521.com")
-        self.assertEqual(rows["javdb"]["default_host"], "javdb.com")
+        self.assertEqual(rows["javdb"]["default_host"], "javdb573.com")
         self.assertEqual(rows["javdb"]["label"], "JavDB")
         # 没动过的那一站留空：框里显示的是占位符，不是一串要人去认的默认值。
         self.assertEqual(rows["missav"]["host"], "")

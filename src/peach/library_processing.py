@@ -51,7 +51,11 @@ ISSUE_PREVIEW_LIMIT = 20
 #: 扫描、资料与预览共用的阶段名，同时用于接口和页面。
 SCAN_STAGE, COLLECT_STAGE, ALL_STAGES = 'scan', 'collect', 'all'
 METADATA_STAGE, PREVIEWS_STAGE = 'metadata', 'previews'
-STAGES = (ALL_STAGES, SCAN_STAGE, COLLECT_STAGE, METADATA_STAGE, PREVIEWS_STAGE)
+#: 只读本机：扫描、写番号、登记本地海报、把本地 NFO 收成候选，全程不发一个网络请求。
+#: 番号与海报本来就在联网之前落库，这一档把它们单独跑完，再走收尾的自动落库；
+#: 网盘/被封的站让 `collect` 每行都卡在超时上时，用它先把本地能定的都定了。
+LOCAL_STAGE = 'local'
+STAGES = (ALL_STAGES, SCAN_STAGE, COLLECT_STAGE, METADATA_STAGE, PREVIEWS_STAGE, LOCAL_STAGE)
 
 #: 没有动作截止时间的阶段（本地读取）超过这么久没有心跳就在页面上预警。
 STALL_AFTER_SECONDS = 120.0
@@ -67,7 +71,7 @@ MISS_TTL_SECONDS = 7 * 24 * 3600
 #: 每分钟 20 页）。参照面：每分钟 40～50 页实测会招来 3～7 天的封 IP，`harvest_directory_links`
 #: 那条批量线仍按 5 秒跑。撞上 403 不再是盲等 24 小时——`scraping_access.FIRST_BLOCKED_PAUSE`
 #: 先停 15 分钟，连着再撞才翻倍，所以这一档收紧的代价是有限且可观测的（docs/SOURCING.md）。
-SOURCE_INTERVALS = {'javdb.com': 3.0, 'jdbstatic.com': 3.0}
+SOURCE_INTERVALS = {'javdb573.com': 3.0, 'javdb.com': 3.0, 'jdbstatic.com': 3.0}
 SOURCE_LABELS = {'r18dev': 'r18.dev', 'dmm': 'DMM / FANZA', 'avbase': 'AVBase', 'javbus': 'JavBus', 'javdb': 'javdb',
                  'fc2': 'FC2', 'fc2cmadb': 'FC2CMADB', 'fc2ppvdb': 'FC2PPV-DB', 'javten': 'JAVten',
                  'javarchive': 'JavArchive',
@@ -1655,7 +1659,7 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
     """发现本趟可访问的来源根，按阶段登记文件并探测新视频。"""
     result = _SourceScan([])
     chosen_paths = _chosen_asset_paths(db_path, asset_ids)
-    scan = asset_ids is None and stage in (ALL_STAGES, SCAN_STAGE)
+    scan = asset_ids is None and stage in (ALL_STAGES, SCAN_STAGE, LOCAL_STAGE)
     mounts = {key: tuple(str(value) for value in values) for key, values in config.mounts.items()}
     ffprobe = _ffprobe_path(config) if scan else None
     for source, roots in locations.items():
@@ -1720,6 +1724,20 @@ def _candidate_scope(groups, asset_ids):
     chosen = {str(value) for value in asset_ids}
     return {key: value for key, value in groups.items()
             if str(value.get('asset_id') or '') in chosen}
+
+
+def _remote_answers(remote, row, code, missing, cover_root, groups, target_key, *,
+                    update, issue, stage):
+    """联网补全这一步的结果。「只读本机」这一档直接返回空。
+
+    番号、本地海报与本地 NFO 都已经在这一步之前落库，联网补的只是「本地没有的那几格」，
+    不是本地结果的成立条件。被墙挡住的站让每一行都在这里耗尽超时，本地能定的却跟着一起
+    停在半路——所以把它单独拆出来，让「不联网」是一个能独立命名、能单独测试的选择。
+    """
+    if stage == LOCAL_STAGE:
+        return [], 0
+    return remote.collect(row, code, missing, cover_root, update=update, issue=issue,
+                          answered=_answered_sources(groups, target_key, missing))
 
 
 def _finish_collection(config, database, candidate_root, cover_root, groups, remote, *,
@@ -1907,8 +1925,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
     if asset_ids is not None and retry_ids is not None:
         raise ValueError('选择项目与失败重试不能同时使用')
     selected_ids = _asset_selection(db_path, asset_ids)
-    if stage == PREVIEWS_STAGE and database is None:
-        raise ValueError('生成预览图需要共享馆藏写入连接')
+    if stage in (PREVIEWS_STAGE, LOCAL_STAGE) and database is None:
+        raise ValueError('这一档需要共享馆藏写入连接')
     routes = metadata_routes.parse_route_overrides(route_overrides)
     path = Path(state_file) if state_file is not None else state_path(config)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -2092,8 +2110,9 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                     entries.append(('local_nfo', payload, evidence_path))
                 local_fields = _fields(payload, genre_decisions) if payload else {}
                 missing = _missing_fields(row, local_fields)
-                found, covers = remote.collect(row, code, missing, cover_root, update=update, issue=issue,
-                                               answered=_answered_sources(groups, target_key, missing))
+                found, covers = _remote_answers(
+                    remote, row, code, missing, cover_root, groups, target_key,
+                    update=update, issue=issue, stage=stage)
                 entries.extend(found)
                 state['covers'] += covers
                 covered.append((row['id'], covers))

@@ -104,7 +104,7 @@ class JudgeTests(unittest.TestCase):
                        "chain": ["深田えいみ", "天海こころ"]}
 
     def judge(self, current, former=""):
-        return self.module.judge(self.record, page(current, former), "https://javdb.com/x")
+        return self.module.judge(self.record, page(current, former), "https://javdb573.com/x")
 
     def test_a_name_written_both_ways_on_one_page_is_the_evidence(self):
         row = self.judge("深田詠美, 深田えいみ")
@@ -190,7 +190,7 @@ class SimplifyTests(unittest.TestCase):
     def test_a_site_renamed_row_carries_the_new_name_as_the_candidate(self):
         """改了名的那些也要有候选，不然复核件里只写着「站上不是这个名字了」。"""
         self.record.update(name="京香じゅりあ", chain=["京香じゅりあ", "JULIA"])
-        row = self.module.judge(self.record, page("JULIA", "京香じゅりあ"), "https://javdb.com/x")
+        row = self.module.judge(self.record, page("JULIA", "京香じゅりあ"), "https://javdb573.com/x")
         self.assertEqual(row["verdict"], "改艺名（现名栏是另一个艺名）")
         self.assertEqual(row["adopt"], "JULIA")
         self.assertEqual(row["jp"], "京香じゅりあ")
@@ -266,7 +266,7 @@ class AliasCandidateTests(unittest.TestCase):
 
     def candidates(self, current, former="", owners=None):
         return self.module.alias_candidates(
-            self.record, page(current, former), "https://javdb.com/actors/RJM8",
+            self.record, page(current, former), "https://javdb573.com/actors/RJM8",
             owners or {})
 
     def test_a_chinese_writing_in_the_former_name_field_is_a_candidate(self):
@@ -365,7 +365,7 @@ class HarvestTests(unittest.TestCase):
     def test_one_page_feeds_both_sheets(self):
         site = FakeSite({
             self.search("深田えいみ"): box("/actors/BBB", "深田詠美, 深田えいみ"),
-            "https://javdb.com/actors/BBB": page("深田詠美, 深田えいみ", "天海こころ")})
+            "https://javdb573.com/actors/BBB": page("深田詠美, 深田えいみ", "天海こころ")})
         names, aliases = self.module.harvest(self.con, site, 0)
         self.assertEqual([row["verdict"] for row in names], ["ok"])
         self.assertEqual([(row["alias"], row["origin"]) for row in aliases],
@@ -375,22 +375,22 @@ class HarvestTests(unittest.TestCase):
         """别名进的是身份。配错了人，比缺一个写法更难查回来。"""
         site = FakeSite({
             self.search("深田えいみ"): box("/actors/BBB", "深田詠美, 深田えいみ"),
-            "https://javdb.com/actors/BBB": page("深田詠美, 深田えいみ"),
+            "https://javdb573.com/actors/BBB": page("深田詠美, 深田えいみ"),
             self.search("三上悠亚"): (box("/actors/AAA", "三上悠亞, 三上悠亜")
                                      + box("/actors/CCC", "三上悠亞, 三上悠亜"))})
         names, aliases = self.module.harvest(self.con, site, 0, "all")
         crowded = [row for row in aliases if row["current_name"] == "三上悠亚"]
         self.assertEqual([row["verdict"] for row in crowded],
                          ["多页（同名两位，分不清是哪一页）"])
-        self.assertNotIn("https://javdb.com/actors/AAA", site.asked)
+        self.assertNotIn("https://javdb573.com/actors/AAA", site.asked)
 
     def test_the_name_sheet_keeps_to_the_performers_still_named_in_kana(self):
         """`--scope all` 放开的只是别名那一份。中文规范名不需要再定一次规范名。"""
         site = FakeSite({
             self.search("深田えいみ"): box("/actors/BBB", "深田詠美, 深田えいみ"),
-            "https://javdb.com/actors/BBB": page("深田詠美, 深田えいみ"),
+            "https://javdb573.com/actors/BBB": page("深田詠美, 深田えいみ"),
             self.search("三上悠亚"): box("/actors/AAA", "三上悠亞, 三上悠亜"),
-            "https://javdb.com/actors/AAA": page("三上悠亞, 三上悠亜")})
+            "https://javdb573.com/actors/AAA": page("三上悠亞, 三上悠亜")})
         names, aliases = self.module.harvest(self.con, site, 0, "all")
         self.assertEqual({row["current_name"] for row in names}, {"深田えいみ"})
         self.assertEqual({row["current_name"] for row in aliases},
@@ -433,7 +433,7 @@ class ApplyAliasTests(unittest.TestCase):
 
     def candidate(self, **over):
         row = {"entity_id": 1, "current_name": "桥本有菜", "alias": "新有菜",
-               "origin": "别名栏", "verdict": "ok", "url": "https://javdb.com/actors/RJM8"}
+               "origin": "别名栏", "verdict": "ok", "url": "https://javdb573.com/actors/RJM8"}
         row.update(over)
         return row
 

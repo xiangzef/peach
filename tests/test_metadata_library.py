@@ -75,6 +75,15 @@ _ARCHIVE_COVER = 'https://img.javstore.net/images/2023/12/26/3232110pl.jpg'
 _ARCHIVE_COVER_SECOND = 'https://img.javstore.net/images/2023/12/26/FC2PPV-3232110-2.jpg'
 
 
+def _tiny_jpeg(size=(16, 24)):
+    """真能解码的一张最小 JPEG：本地海报登记要读图片头，假的字节会被判成「无法读取」。"""
+    import io
+    from PIL import Image
+    buffer = io.BytesIO()
+    Image.new('RGB', size, (200, 40, 60)).save(buffer, format='JPEG')
+    return buffer.getvalue()
+
+
 def _archive_pages(url):
     """JavArchive 那一档的两跳：先搜出站内地址，作品页上才有封面和正文那块资料。和真的 `_fetch` 一样交字节。"""
     if 'search' in url:
@@ -263,6 +272,44 @@ class LibraryNfoTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 _apply_metadata_candidate(connection, title, candidate, '2026-09-06', owner)
         self.assertEqual(snapshot(config)['status'], 'complete')
+
+    def test_local_stage_writes_code_and_poster_without_asking_any_source(self):
+        """「只读本机」：番号与海报落在联网之前，所以这一档不发请求也能把它们定下来。"""
+        media = self.root / 'media'
+        movie = media / 'JULIA'
+        movie.mkdir(parents=True)
+        (movie / 'ABW-358-C.mp4').write_bytes(b'video')
+        (movie / 'ABW-358.nfo').write_text(
+            '<movie><code>ABW-358</code><title>本地写的标题</title>'
+            '<actor><name>涼森れむ</name></actor></movie>', encoding='utf-8')
+        (movie / 'ABW-358-poster.jpg').write_bytes(_tiny_jpeg())
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        factory = Mock()
+        from peach.repository import LedgerDatabase
+        result = process_library(config, db, self.root / 'generated', self.root / 'covers',
+                                 stage='local', provider_factory=factory,
+                                 database=LedgerDatabase(db))
+        self.assertEqual(result['status'], 'complete')
+        factory.assert_not_called()
+        with closing(sqlite3.connect(db)) as connection:
+            row = connection.execute(
+                'SELECT code FROM asset WHERE medium="video"').fetchone()
+            self.assertEqual(row[0], 'ABW-358')
+        self.assertTrue((self.root / 'covers' / 'ABW-358.jpg').is_file())
+
+    def test_local_stage_needs_the_shared_ledger_connection(self):
+        """这一档靠收尾的自动落库生效，没有写入连接就等于只收候选、白跑一遍。"""
+        media = self.root / 'media'
+        media.mkdir()
+        (media / 'ABW-358.mp4').write_bytes(b'video')
+        db = fresh_ledger(self.root)
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True,
+                             locations={'local': (str(media),)})
+        with self.assertRaises(ValueError):
+            process_library(config, db, self.root / 'generated', self.root / 'covers',
+                            stage='local', provider_factory=Mock(), database=None)
 
     def test_status_reads_do_not_start_processing(self):
         from peach.web_library_processing import q_library_processing
@@ -932,7 +979,8 @@ class LibraryNfoTests(unittest.TestCase):
     def test_javdb_keeps_its_own_host_interval_on_both_of_its_hosts(self):
         """这一档的节奏由用户定，改动要连图床一起改：页面与图分别落在两个主机上。"""
         from peach.library_processing import SOURCE_INTERVALS
-        self.assertEqual(SOURCE_INTERVALS, {'javdb.com': 3.0, 'jdbstatic.com': 3.0})
+        self.assertEqual(SOURCE_INTERVALS,
+                         {'javdb573.com': 3.0, 'javdb.com': 3.0, 'jdbstatic.com': 3.0})
 
     def test_community_sources_are_asked_once_per_code_and_say_why_they_failed(self):
         """资料和封面两步都要社区来源的结果，javdb 的配额经不起同一部片问两遍。"""

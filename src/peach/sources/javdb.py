@@ -20,9 +20,10 @@ from ..javdb import LOGIN, clean
 from .base import FailureReason, Page, Session, SiteConfig, SiteRecord, SiteSource, SourceFailure
 
 #: 主机间隔由用户定（2026-09-22 定为 3 秒，每分钟 20 页）。参照面：每分钟 40～50 页会招来 3～7 天
-#: 的封 IP。页面与图分别落在 `javdb.com` 与 `jdbstatic.com` 两个主机上，间隔要一起管。
+#: 的封 IP。页面与图分别落在 `javdb573.com` 与 `jdbstatic.com` 两个主机上，间隔要一起管。
 JAVDB = SiteConfig(name="javdb", label="javdb", provider="javdb-page",
-                   base_url="https://javdb.com", domains=("javdb.com", "jdbstatic.com", "jdbimgs.com"),
+                   base_url="https://javdb573.com",
+                   domains=("javdb573.com", "javdb.com", "jdbstatic.com", "jdbimgs.com"),
                    stage="community", interval=3.0, cookie=True)
 
 _BOX = re.compile(r'<a href="(/v/[A-Za-z0-9]+)" class="box" title="[^"]*">.*?<strong>([^<]+)</strong>', re.S)
